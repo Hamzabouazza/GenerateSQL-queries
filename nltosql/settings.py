@@ -54,7 +54,9 @@ ROOT_URLCONF = "nltosql.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ['C:/Users/Anas/OneDrive/Desktop/QueryGenerator/nltosql/myapp/templates'],
+        "DIRS": [
+            "C:/Users/Anas/OneDrive/Desktop/QueryGenerator/nltosql/myapp/templates"
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -130,102 +132,95 @@ from langchain.prompts.prompt import PromptTemplate
 import re
 import sqlparse
 
+
 def extract_schema(s):
-    
-  # extract table names from the create table statements
-  table_names = re.findall(r"(TABLE +\w+ *\()", s,flags=re.IGNORECASE)
-  table_names = [re.sub("table","",table_name[:-1],flags=re.IGNORECASE).strip() for table_name in table_names]
-  
-  # Extract column names
- 
-  column_pattern = re.compile(r'(\w+)\s+([\w()]+)(?:\s+PRIMARY KEY)?(?:,)?')
-  columns = column_pattern.findall(s)
+    # extract table names from the create table statements
+    table_names = re.findall(r"(TABLE +\w+ *\()", s, flags=re.IGNORECASE)
+    table_names = [
+        re.sub("table", "", table_name[:-1], flags=re.IGNORECASE).strip()
+        for table_name in table_names
+    ]
 
-  columns=[c for c in columns if 'TABLE' not in c]
-  table_name= ''
-  columns_names=[]
-  for col in columns:
-      if '(' in col:
-          table_name=col[0]
-          continue
-      else:
-            columns_names.append(table_name+'.'+col[0]+' '+col[1])
+    # Extract column names
 
- # result = []
-  #for table_name, columns in table_names:
-    
-    
-   # for column, col_type in columns_list:
+    column_pattern = re.compile(r"(\w+)\s+([\w()]+)(?:\s+PRIMARY KEY)?(?:,)?")
+    columns = column_pattern.findall(s)
+
+    columns = [c for c in columns if "TABLE" not in c]
+    table_name = ""
+    columns_names = []
+    for col in columns:
+        if "(" in col:
+            table_name = col[0]
+            continue
+        else:
+            columns_names.append(table_name + "." + col[0] + " " + col[1])
+
+    # result = []
+    # for table_name, columns in table_names:
+
+    # for column, col_type in columns_list:
     #    result.append(f'{table_name}.{column} {col_type}')
-        
-     
-  columns_names=",".join(columns_names)
-  table_names = ",".join(table_names)
-  
-  
-  print(columns_names)
-  print(table_names)  
-  
-  return table_names, columns_names
+
+    columns_names = ",".join(columns_names)
+    table_names = ",".join(table_names)
+
+    return table_names, columns_names
 
 
-EXTRACT_SCHEMA = extract_schema
-examples = [
-    {
-        "question": "Select all possible country name pairs (e.g. France-USA, FranceChina, etc.). Make sure that there are no duplicates of the type (France, USA) and (USA,France)",
-        "table_name": "athletes,records,sports,nationalites",
-        "description": "",
-        "columns": "athletes.idAthlete, athletes.nom,athletes.prenom,athletes.dateNaissance,athletes.sexe,records.idRecords,records.idAthlete,records.idSport,records.idNationalite,records.record,records.date,records.lieu,sports.idSports,sports.sport,nationalites.idNationalite,nationalites.nationalite,nationalites.nomPays",
-        "answer": '''
-            SELECT N1.nomPays, N2.nomPays FROM Nationalites AS N1, Nationalites AS N2 WHERE N1.nomPays > N2.nomPays;
-        ''',
-    },
-    {
-        "question": "Who are the female athletes (idAthlete, last name, first name) of Australian nationality holding a record in a swimming event?",
-         "table_name": "athletes,records,sports,nationalites",
-         "description": "",
-        "columns": "athletes.idAthlete, athletes.nom,athletes.prenom,athletes.dateNaissance,athletes.sexe,records.idRecords,records.idAthlete,records.idSport,records.idNationalite,records.record,records.date,records.lieu,sports.idSports,sports.sport,nationalites.idNationalite,nationalites.nationalite,nationalites.nomPays",
-        "answer": " SELECT idAthlete, nom, prenom FROM ((Athletes NATURAL JOIN Records) NATURAL JOIN Sports) NATURAL JOIN Nationalites WHERE sport='Natation' AND nomPays ='Australie' AND sexe='F';",
-    },
-    {
-        "question": "Select Surname, first name and identifier of delivery people working in a pizzeria that can accommodate at least maximum 4 deliverers and who delivers in at least two cities with more than 25,000 inhabitants",
-        "table_name": "livreur,vehicule,modele,pizzeria,livraison,ville",
-        "description": "",
-        "columns": "livreur.idlivreur,livreur.idPizzeria,livreur.nom,livreur.prenom,livreur.ville,vehicule.idVehicule,vehicule.idPizzeria,vehicule.capacite,vehicule.modele,modele.nomModele,modele.marque,modele.puisance,pizzeria.idPizzeria,pizzeria.nomPizzeria,pizzeria.nombreLivreursMax,pizzeria.nomVille,livraison.idPizzeria,livraison.villeDesservie,ville.nonmVille,ville.codeCommune,ville.nombreHabitants",
-        "answer": "SELECT nom, prenom, idLivreur FROM Livreur WHERE idPizzeria IN (SELECT idPizzeria FROM Pizzeria NATURAL JOIN Livraison JOIN Ville ON villeDesservie = Ville.nomVille WHERE nombreHabitants > 25000 AND nombreLivreursMax < 5 GROUP BY idPizzeria HAVING COUNT(villeDesservie) > 1 );",
-    },
-    {
-        "question": "Select Pizzerias owning at least two 'Mob50' vehicles and one 'Mot125' vehicle and delivering the city of Nantes",
-        "table_name": "livreur,vehicule,modele,pizzeria,livraison,ville",
-        "description": "",
-        "columns": "livreur.idlivreur,livreur.idPizzeria,livreur.nom,livreur.prenom,livreur.ville,vehicule.idVehicule,vehicule.idPizzeria,vehicule.capacite,vehicule.modele,modele.nomModele,modele.marque,modele.puisance,pizzeria.idPizzeria,pizzeria.nomPizzeria,pizzeria.nombreLivreursMax,pizzeria.nomVille,livraison.idPizzeria,livraison.villeDesservie,ville.nonmVille,ville.codeCommune,ville.nombreHabitants",
-        "answer": "SELECT idPizzeria, nomPizzeria FROM Pizzeria NATURAL JOIN Livraison WHERE idPizzeria IN (SELECT idPizzeria FROM Vehicule WHERE modele = 'Mob50' ) AND idPizzeria IN (SELECT idPizzeria FROM Vehicule WHERE modele = 'Mot125' ) AND villeDesservie = 'Nantes';",
-    },
-        {
-        "question": "Select Pizzerias owning at least two 'Mob50' vehicles and one 'Mot125' vehicle and delivering the city of Nantes",
-        "table_name": "livreur,vehicule,modele,pizzeria,livraison,ville",
-        "description": "",
-        "columns": "livreur.idlivreur,livreur.idPizzeria,livreur.nom,livreur.prenom,livreur.ville,vehicule.idVehicule,vehicule.idPizzeria,vehicule.capacite,vehicule.modele,modele.nomModele,modele.marque,modele.puisance,pizzeria.idPizzeria,pizzeria.nomPizzeria,pizzeria.nombreLivreursMax,pizzeria.nomVille,livraison.idPizzeria,livraison.villeDesservie,ville.nonmVille,ville.codeCommune,ville.nombreHabitants",
-        "answer": "SELECT idPizzeria, nomPizzeria FROM Pizzeria NATURAL JOIN Livraison WHERE idPizzeria IN (SELECT idPizzeria FROM Vehicule WHERE modele = 'Mob50' ) AND idPizzeria IN (SELECT idPizzeria FROM Vehicule WHERE modele = 'Mot125' ) AND villeDesservie = 'Nantes';",
-    },
-]
+#EXTRACT_SCHEMA = extract_schema
 
-os.environ["OPENAI_API_KEY"] = "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"
+
+os.environ["OPENAI_API_KEY"] = "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"
 
 llm = OpenAI(model_name="gpt-3.5-turbo", n=2)
 
 current_time = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
 
-_DEFAULT_TEMPLATE = """{question}\n{table_name}\n{columns}\n{description}\n{answer}"""
+_DEFAULT_TEMPLATE = """
+                        I prioritize the description of columns, followed by column names and table names when generating SQL queries. 
+                        Please generate an SQL query that answers the question "{question}" based on my database informations in the following json file:
+
+                        ---------- Start of Json File ----------
+                        {json_file_content}
+                        ---------- End of Json File -----------
+                        
+                        Here is some examples:
+                        "question": "Find the total amount use for each value of system product code and authorization number",
+                        "answer": 
+                            SELECT a.CD_AUTO, a.NUM_AUTO, SUM(u.MNT_UTIL) AS total_utilisation
+                            FROM orc_autorisation a
+                            JOIN orc_utilisation u
+                            ON a.CD_AUTO = u.CD_AUTO AND a.NUM_AUTO = u.NUM_AUTO
+                            GROUP BY a.CD_AUTO, a.NUM_AUTO;
+                            
+                        "question": "Find the total revenue for each month and year",
+                        "answer": 
+                            SELECT orc_marche_compte.DERN_MOIS_AN AS mois, orc_marche_compte.DERN_ANNEE AS annee, SUM(orc_marche_compte.REVENUS) AS revenu_total
+                            FROM orc_personne_host
+                            INNER JOIN orc_marche_compte ON orc_personne_host.NUMERO_PERSONNE_HOST = orc_marche_compte.IDTFCL
+                            GROUP BY orc_marche_compte.DERN_MOIS_AN, orc_marche_compte.DERN_ANNEE
+                                
+                                
+                        "question": "get adresses and month situation for each client",
+                        "answer": 
+                           SELECT  orc_personne_host.CD_VILLE,orc_personne_host.VILLE,orc_personne_host.PAYSADR,orc_personne_host.CD_POST,orc_marche_compte.DERN_MOIS_AN
+                           FROM orc_personne_host,orc_personne_host
+                           INNER JOIN orc_marche_compte ON orc_personne_host.NUMERO_PERSONNE_HOST = orc_marche_compte.IDTFCL
+                        
+                        
+                        Additional informations:
+                        Json file has three levels:
+                        The first level have table names as keys.
+                        The second level contains column names for each table.
+                        The third level contains as keys "type" and "description" which are the type and description for each column.
+
+                        Write your answer here::
+                    """
 PROMPT = PromptTemplate(
-    input_variables=["question", "table_name", "columns","description","answer"], template=_DEFAULT_TEMPLATE
+    input_variables=["question", "json_file_content"], template=_DEFAULT_TEMPLATE
 )
 
-prompt = FewShotPromptTemplate(
-    examples=examples, 
-    example_prompt=PROMPT,
-    suffix="Question: {question}, Table: {table_name}, Columns: {columns}, description:{description}, Answer: ",
-    input_variables=["question", "table_name","description", "columns"],
-)
 
-LLM_CHAIN = LLMChain(llm=llm, prompt=prompt)
+
+LLM_CHAIN = LLMChain(llm=llm, prompt=PROMPT)
